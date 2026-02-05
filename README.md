@@ -51,11 +51,15 @@ Works with **any media player** that posts standard Android media notifications,
 
 ## 📱 Screenshots
 
-> Upload screenshots to the repository and link them here.
+- **Music Mode**
+(https://github.com/user-attachments/assets/93819c89-ff75-46ca-8f8c-f6e414e5f344)
 
-- **Music Mode**  
-- **Idle Clock Mode**  
+- **Idle Clock Mode**
+(https://github.com/user-attachments/assets/91677c2a-5798-4824-88ac-506e0ea2a507)
+
 - **Notification Drawer**
+(https://github.com/user-attachments/assets/64dccc6d-f790-4227-a11b-fe38b5beafbf)
+
 
 ---
 
