@@ -17,7 +17,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
-import androidx.compose.foundation.ExperimentalFoundationApi // Fixed missing import
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
@@ -26,7 +26,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Audiotrack // Now works with Extended Icons
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -36,7 +35,6 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -50,7 +48,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsControllerCompat
-import androidx.palette.graphics.Palette // Fixed missing import
+import androidx.palette.graphics.Palette
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -104,27 +102,18 @@ fun IdleDisplayScreen() {
     // Progress
     var currentProgress by remember { mutableFloatStateOf(0f) }
 
-    // Source App Icon
-    var sourceAppIcon by remember { mutableStateOf<Bitmap?>(null) }
-
-    // --- Logic ---
-    LaunchedEffect(mediaState.packageName) {
-        if (mediaState.packageName.isNotEmpty()) {
-            launch(Dispatchers.IO) {
-                try {
-                    val pm = context.packageManager
-                    val drawable = pm.getApplicationIcon(mediaState.packageName)
-                    sourceAppIcon = drawable.toBitmap()
-                } catch (_: Exception) { sourceAppIcon = null }
-            }
-        } else { sourceAppIcon = null }
-    }
-
+    // --- Animation Logic ---
     val infiniteTransition = rememberInfiniteTransition(label = "breathing")
+    val idleColor1 = Color(0xFF0F2027)
+    val idleColor2 = Color(0xFF2C5364)
+
     val breathingColor by infiniteTransition.animateColor(
-        initialValue = Color(0xFF0F2027),
-        targetValue = Color(0xFF2C5364),
-        animationSpec = infiniteRepeatable(tween(4000, easing = LinearEasing), RepeatMode.Reverse),
+        initialValue = idleColor1,
+        targetValue = idleColor2,
+        animationSpec = infiniteRepeatable(
+            animation = tween(4000, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
         label = "idleBreath"
     )
 
@@ -133,11 +122,11 @@ fun IdleDisplayScreen() {
 
     val clockSize by animateFloatAsState(
         targetValue = if (mediaState.isPlaying) 80f else 130f,
-        animationSpec = tween(800, easing = FastOutSlowInEasing),
+        animationSpec = tween(durationMillis = 800, easing = FastOutSlowInEasing),
         label = "clockSize"
     )
 
-    // Loops
+    // --- Loops & Listeners ---
     LaunchedEffect(mediaState) {
         while (true) {
             if (mediaState.isPlaying && mediaState.duration > 0) {
@@ -180,14 +169,18 @@ fun IdleDisplayScreen() {
         if (mediaState.albumArt != null) {
             launch(Dispatchers.Default) {
                 Palette.from(mediaState.albumArt!!).generate { palette ->
-                    val colorInt = palette?.getLightVibrantColor(palette.getDominantColor(0xFF121212.toInt())) ?: 0xFF121212.toInt()
+                    val colorInt = palette?.getLightVibrantColor(
+                        palette.getDominantColor(0xFF121212.toInt())
+                    ) ?: 0xFF121212.toInt()
                     ambientColor = Color(colorInt)
                 }
             }
-        } else { ambientColor = Color(0xFF121212) }
+        } else {
+            ambientColor = Color(0xFF121212)
+        }
     }
 
-    // --- UI ---
+    // --- MAIN UI ---
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -202,14 +195,25 @@ fun IdleDisplayScreen() {
                 .offset(x = offsetX.dp, y = offsetY.dp)
                 .blur(blurRadius)
         ) {
-            // Icons
+            // Top Icons
             Box(
-                modifier = Modifier.align(Alignment.TopStart).clip(CircleShape).background(Color.Black.copy(0.4f)).clickable { showSettings = true }.padding(12.dp)
-            ) { Icon(Icons.Default.Settings, "Settings", tint = Color.White) }
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .clip(CircleShape)
+                    .background(Color.Black.copy(alpha = 0.4f))
+                    .clickable { showSettings = true }
+                    .padding(12.dp)
+            ) {
+                Icon(Icons.Default.Settings, "Settings", tint = Color.White)
+            }
 
             if (appSettings.showBattery) {
                 Box(
-                    modifier = Modifier.align(Alignment.TopEnd).clip(RoundedCornerShape(50)).background(Color.Black.copy(0.4f)).padding(horizontal = 16.dp, vertical = 8.dp)
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .clip(RoundedCornerShape(50))
+                        .background(Color.Black.copy(alpha = 0.4f))
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("$batteryLevel%", fontFamily = PixelFont, color = if (isCharging) Color.Green else Color.White, fontSize = 16.sp)
@@ -218,39 +222,63 @@ fun IdleDisplayScreen() {
                 }
             }
 
-            // Center Content (Move Transition)
+            // Center Content (Transition)
             Column(
                 modifier = Modifier
                     .align(Alignment.Center)
                     .fillMaxWidth()
-                    .animateContentSize(spring(stiffness = Spring.StiffnessLow)),
+                    .animateContentSize(animationSpec = spring(stiffness = Spring.StiffnessLow)),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
+
+                // Music Section (Expands/Collapses)
                 AnimatedVisibility(
                     visible = mediaState.isPlaying,
-                    enter = expandVertically(tween(800)) + fadeIn(tween(500, delayMillis = 600)),
-                    exit = shrinkVertically(tween(800)) + fadeOut(tween(300))
+                    enter = expandVertically(animationSpec = tween(800)) +
+                            fadeIn(animationSpec = tween(500, delayMillis = 600)),
+                    exit = shrinkVertically(animationSpec = tween(800)) +
+                            fadeOut(animationSpec = tween(300))
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Box(contentAlignment = Alignment.Center) {
-                            CircularProgressIndicator(progress = { 1f }, modifier = Modifier.size(310.dp), color = Color.White.copy(0.1f), strokeWidth = 6.dp)
-                            CircularProgressIndicator(progress = { currentProgress }, modifier = Modifier.size(310.dp), color = animatedBgColor, strokeWidth = 6.dp, strokeCap = StrokeCap.Round)
+                            CircularProgressIndicator(
+                                progress = { 1f },
+                                modifier = Modifier.size(310.dp),
+                                color = Color.White.copy(alpha = 0.1f),
+                                strokeWidth = 6.dp,
+                            )
+                            CircularProgressIndicator(
+                                progress = { currentProgress },
+                                modifier = Modifier.size(310.dp),
+                                color = animatedBgColor,
+                                strokeWidth = 6.dp,
+                                strokeCap = StrokeCap.Round
+                            )
                             Card(
                                 shape = RoundedCornerShape(1000.dp),
                                 elevation = CardDefaults.cardElevation(12.dp),
-                                modifier = Modifier.size(280.dp).clickable {
-                                    if (mediaState.packageName.isNotEmpty()) {
-                                        try {
-                                            val launchIntent = context.packageManager.getLaunchIntentForPackage(mediaState.packageName)
-                                            if (launchIntent != null) context.startActivity(launchIntent)
-                                        } catch (_: Exception) { Toast.makeText(context, "Error", Toast.LENGTH_SHORT).show() }
+                                modifier = Modifier
+                                    .size(280.dp)
+                                    .clickable {
+                                        if (mediaState.packageName.isNotEmpty()) {
+                                            try {
+                                                val launchIntent = context.packageManager.getLaunchIntentForPackage(mediaState.packageName)
+                                                if (launchIntent != null) context.startActivity(launchIntent)
+                                            } catch (_: Exception) {
+                                                Toast.makeText(context, "Could not open app", Toast.LENGTH_SHORT).show()
+                                            }
+                                        }
                                     }
-                                }
                             ) {
                                 Box(Modifier.fillMaxSize().background(Color.DarkGray)) {
                                     if (mediaState.albumArt != null) {
-                                        Image(bitmap = mediaState.albumArt!!.asImageBitmap(), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                                        Image(
+                                            bitmap = mediaState.albumArt!!.asImageBitmap(),
+                                            contentDescription = "Tap to open",
+                                            contentScale = ContentScale.Crop,
+                                            modifier = Modifier.fillMaxSize()
+                                        )
                                     }
                                 }
                             }
@@ -259,7 +287,7 @@ fun IdleDisplayScreen() {
                     }
                 }
 
-                // Shared Clock
+                // Clock
                 Text(
                     text = SimpleDateFormat("HH:mm", Locale.getDefault()).format(currentTime),
                     fontFamily = PixelFont,
@@ -270,7 +298,7 @@ fun IdleDisplayScreen() {
                     textAlign = TextAlign.Center
                 )
 
-                // Date (Idle)
+                // Date (Only in Idle)
                 AnimatedVisibility(
                     visible = !mediaState.isPlaying,
                     enter = fadeIn(tween(1000)) + expandVertically(),
@@ -278,15 +306,23 @@ fun IdleDisplayScreen() {
                 ) {
                     Column {
                         Spacer(Modifier.height(10.dp))
-                        Text(SimpleDateFormat("EEEE, MMMM dd", Locale.getDefault()).format(currentTime).uppercase(), fontFamily = PixelFont, fontSize = 22.sp, color = Color.White.copy(0.7f), letterSpacing = 4.sp, textAlign = TextAlign.Center)
+                        Text(
+                            text = SimpleDateFormat("EEEE, MMMM dd", Locale.getDefault()).format(currentTime).uppercase(),
+                            fontFamily = PixelFont,
+                            fontSize = 22.sp,
+                            color = Color.White.copy(0.7f),
+                            letterSpacing = 4.sp,
+                            textAlign = TextAlign.Center
+                        )
                     }
                 }
 
-                // Metadata (Playing)
+                // Metadata (Only in Music)
                 AnimatedVisibility(
                     visible = mediaState.isPlaying,
-                    enter = fadeIn(tween(500, delayMillis = 600)) + expandVertically(tween(500, delayMillis = 600)),
-                    exit = fadeOut(tween(300)) + shrinkVertically()
+                    enter = fadeIn(animationSpec = tween(500, delayMillis = 600)) +
+                            expandVertically(animationSpec = tween(500, delayMillis = 600)),
+                    exit = fadeOut(animationSpec = tween(300)) + shrinkVertically()
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Spacer(Modifier.height(20.dp))
@@ -294,40 +330,13 @@ fun IdleDisplayScreen() {
                         Spacer(Modifier.height(8.dp))
                         Text(mediaState.artist, fontFamily = PixelFont, fontSize = 18.sp, color = Color.White.copy(0.7f), maxLines = 1, overflow = TextOverflow.Ellipsis)
 
-                        Spacer(Modifier.height(20.dp))
-
-                        // Source Icon
-                        Box(
-                            modifier = Modifier
-                                .clip(CircleShape)
-                                .background(Color.White.copy(alpha = 0.1f))
-                                .clickable {
-                                    if (mediaState.packageName.isNotEmpty()) {
-                                        try {
-                                            val launchIntent = context.packageManager.getLaunchIntentForPackage(mediaState.packageName)
-                                            if (launchIntent != null) context.startActivity(launchIntent)
-                                        } catch (_: Exception) {}
-                                    }
-                                }
-                                .padding(14.dp)
-                        ) {
-                            if (sourceAppIcon != null) {
-                                Image(
-                                    bitmap = sourceAppIcon!!.asImageBitmap(),
-                                    contentDescription = "Source",
-                                    modifier = Modifier.size(32.dp),
-                                    colorFilter = ColorFilter.tint(Color.White)
-                                )
-                            } else {
-                                Icon(Icons.Default.Audiotrack, "Audio", tint = Color.White, modifier = Modifier.size(32.dp))
-                            }
-                        }
+                        // --- REMOVED SOURCE BUTTON HERE ---
                     }
                 }
             }
         }
 
-        // Settings
+        // Settings Overlay
         if (showSettings) {
             AlertDialog(
                 onDismissRequest = { showSettings = false },
@@ -357,11 +366,23 @@ fun IdleDisplayScreen() {
         ) {
             val notification = notificationState ?: return@AnimatedVisibility
             Box(
-                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)).background(Color.Black.copy(0.95f)).padding(32.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
+                    .background(Color.Black.copy(alpha = 0.95f))
+                    .padding(32.dp)
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
                     if (notification.icon != null) {
-                        Image(bitmap = notification.icon.asImageBitmap(), contentDescription = null, modifier = Modifier.size(48.dp).clip(RoundedCornerShape(12.dp)), contentScale = ContentScale.Crop)
+                        Image(
+                            bitmap = notification.icon.asImageBitmap(),
+                            contentDescription = null,
+                            modifier = Modifier.size(48.dp).clip(RoundedCornerShape(12.dp)),
+                            contentScale = ContentScale.Crop
+                        )
                     }
                     Spacer(modifier = Modifier.width(16.dp))
                     Column {
@@ -374,7 +395,6 @@ fun IdleDisplayScreen() {
     }
 }
 
-// Inline Helper
 fun Drawable.toBitmap(): Bitmap {
     if (this is BitmapDrawable) return bitmap
     val bitmap = Bitmap.createBitmap(intrinsicWidth.coerceAtLeast(1), intrinsicHeight.coerceAtLeast(1), Bitmap.Config.ARGB_8888)
